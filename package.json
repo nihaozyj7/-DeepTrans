@@ -1,0 +1,28 @@
+{
+  "name": "deepseek-translator",
+  "version": "1.0.0",
+  "description": "Chrome extension for translating web pages using DeepSeek V4 models",
+  "main": "src/background/background.js",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "lint": "eslint src --ext .ts",
+    "package": "zip -r extension.zip manifest.json dist/ src/popup/ src/options/ src/content/content.css src/icons/"
+  },
+  "keywords": [
+    "chrome-extension",
+    "translation",
+    "deepseek",
+    "ai-translation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chrome": "^0.0.268",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "esbuild": "^0.28.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.5.0"
+  }
+}

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeepSeek Translator 设置</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="options-container">
+    <header class="header">
+      <img src="../icons/icon48.png" alt="Logo" class="logo">
+      <div>
+        <h1>DeepSeek Translator 设置</h1>
+        <p class="subtitle">配置翻译插件的各项参数</p>
+      </div>
+    </header>
+
+    <form id="settings-form">
+      <section class="section">
+        <h2>API 配置</h2>
+        <div class="form-group">
+          <label for="apiKey">DeepSeek API Key</label>
+          <div class="input-with-action">
+            <input type="password" id="apiKey" placeholder="输入你的 API Key" autocomplete="off">
+            <button type="button" id="toggle-key" class="btn-icon" title="显示/隐藏">👁️</button>
+          </div>
+          <p class="help-text">在 <a href="https://platform.deepseek.com/api_keys" target="_blank">DeepSeek 平台</a> 获取 API Key</p>
+        </div>
+        <div class="form-group">
+          <label for="model">翻译模型</label>
+          <select id="model">
+            <option value="deepseek-v4-flash">DeepSeek V4 Flash (快速)</option>
+            <option value="deepseek-v4-pro">DeepSeek V4 Pro (高质量)</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>翻译设置</h2>
+        <div class="form-group">
+          <label for="targetLang">目标语言</label>
+          <select id="targetLang">
+            <option value="zh-CN">简体中文</option>
+            <option value="zh-TW">繁体中文</option>
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+            <option value="ko">한국어</option>
+            <option value="fr">Français</option>
+            <option value="de">Deutsch</option>
+            <option value="es">Español</option>
+            <option value="pt">Português</option>
+            <option value="ru">Русский</option>
+            <option value="ar">العربية</option>
+            <option value="it">Italiano</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="translateMode">翻译模式</label>
+          <select id="translateMode">
+            <option value="full">翻译整个页面</option>
+            <option value="smart">智能识别（推荐）</option>
+            <option value="selection">仅翻译选中文本</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="customSelectors">自定义选择器</label>
+          <input type="text" id="customSelectors" placeholder="p, h1, h2, h3, div.content">
+          <p class="help-text">智能模式下要翻译的元素，用逗号分隔</p>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>高级选项</h2>
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="autoTranslate">
+            自动翻译外语页面
+          </label>
+          <p class="help-text">检测到页面语言与目标语言不同时自动翻译</p>
+        </div>
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="useContext">
+            携带上下文信息
+          </label>
+          <p class="help-text">翻译时携带前后元素的文本作为上下文，可能提高翻译质量，但会增加 API 调用成本</p>
+        </div>
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="showContextMenu">
+            显示右键菜单
+          </label>
+          <p class="help-text">在右键菜单中添加翻译选项</p>
+        </div>
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="enableThinking">
+            启用思考模式
+          </label>
+          <p class="help-text">启用 AI 思考模式可能提高翻译质量，但会增加响应时间和 API 成本</p>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button type="submit" class="btn btn-primary">保存设置</button>
+        <button type="button" id="btn-reset" class="btn btn-outline">恢复默认</button>
+      </div>
+    </form>
+
+    <div id="toast" class="toast"></div>
+  </div>
+
+  <script src="../../dist/options.js"></script>
+</body>
+</html>

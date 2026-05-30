@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeepSeek Translator</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <div class="header">
+      <img src="../icons/icon48.png" alt="Logo" class="logo">
+      <h1>DeepSeek Translator</h1>
+    </div>
+
+    <div class="status" id="status">
+      <span class="status-dot"></span>
+      <span class="status-text">就绪</span>
+    </div>
+
+    <div class="buttons">
+      <button id="btn-translate-page" class="btn btn-primary">
+        <span class="btn-icon">📄</span>
+        翻译整个页面
+      </button>
+      <button id="btn-translate-selection" class="btn btn-secondary">
+        <span class="btn-icon">✏️</span>
+        翻译选中文本
+      </button>
+      <button id="btn-toggle" class="btn btn-outline">
+        <span class="btn-icon">🔄</span>
+        切换原文/译文
+      </button>
+      <button id="btn-clear" class="btn btn-outline btn-danger">
+        <span class="btn-icon">🗑️</span>
+        清除翻译
+      </button>
+    </div>
+
+    <div class="footer">
+      <a href="#" id="btn-options" class="link">打开设置</a>
+      <span class="shortcut">Ctrl+Shift+T</span>
+    </div>
+  </div>
+
+  <script src="../../dist/popup.js"></script>
+</body>
+</html>
