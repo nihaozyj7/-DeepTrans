@@ -5,6 +5,7 @@ interface TranslatedElement {
   originalHTML: string;
   translatedText: string;
   isShowingTranslation: boolean;
+  childMap?: Element[];
 }
 
 const translatedElements = new Map<string, TranslatedElement>();
@@ -57,9 +58,66 @@ function replaceTextNodes(element: HTMLElement, translatedText: string): void {
   }
 }
 
+function replaceMixedContent(
+  element: HTMLElement,
+  translatedText: string,
+  childMap: Element[]
+): boolean {
+  const markerRegex = /\[(\d+)\]/g;
+  const matches = [...translatedText.matchAll(markerRegex)];
+
+  if (matches.length === 0) {
+    return false;
+  }
+
+  const segments: string[] = [];
+  let lastIndex = 0;
+
+  for (const match of matches) {
+    const idx = parseInt(match[1]);
+    if (idx >= 0 && idx < childMap.length) {
+      segments.push(translatedText.substring(lastIndex, match.index));
+      lastIndex = match.index! + match[0].length;
+    }
+  }
+  segments.push(translatedText.substring(lastIndex));
+
+  const originalChildNodes = Array.from(element.childNodes);
+  const textSegments = segments.filter(s => s.length > 0);
+
+  let segIndex = 0;
+  let markerCount = 0;
+
+  for (const node of originalChildNodes) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const t = node.textContent || '';
+      if (t.trim()) {
+        if (segIndex < textSegments.length) {
+          (node as Text).textContent = textSegments[segIndex];
+          segIndex++;
+        } else {
+          (node as Text).textContent = '';
+        }
+      }
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as Element;
+      if (isInlineChild(el) && markerCount < childMap.length) {
+        markerCount++;
+      }
+    }
+  }
+
+  return true;
+}
+
+function isInlineChild(el: Element): boolean {
+  return el.matches('a, span, b, strong, i, em, u, mark, small, sub, sup, abbr, cite, code, img, ruby, rt, rp');
+}
+
 export function replaceWithTranslation(
   elementId: string,
-  translatedText: string
+  translatedText: string,
+  childMap?: Element[]
 ): void {
   const element = document.querySelector(`[${ATTR_ORIGINAL}="${elementId}"]`) as HTMLElement;
   if (!element) return;
@@ -71,11 +129,19 @@ export function replaceWithTranslation(
     originalHTML,
     translatedText,
     isShowingTranslation: true,
+    childMap,
   });
 
   element.setAttribute(ATTR_TRANSLATED, elementId);
 
-  replaceTextNodes(element, translatedText);
+  if (childMap && childMap.length > 0) {
+    const success = replaceMixedContent(element, translatedText, childMap);
+    if (!success) {
+      replaceTextNodes(element, translatedText);
+    }
+  } else {
+    replaceTextNodes(element, translatedText);
+  }
 }
 
 export function toggleOriginalTranslation(): void {
@@ -84,7 +150,14 @@ export function toggleOriginalTranslation(): void {
       info.element.innerHTML = info.originalHTML;
       info.isShowingTranslation = false;
     } else {
-      replaceTextNodes(info.element, info.translatedText);
+      if (info.childMap && info.childMap.length > 0) {
+        const success = replaceMixedContent(info.element, info.translatedText, info.childMap);
+        if (!success) {
+          replaceTextNodes(info.element, info.translatedText);
+        }
+      } else {
+        replaceTextNodes(info.element, info.translatedText);
+      }
       info.isShowingTranslation = true;
     }
   });

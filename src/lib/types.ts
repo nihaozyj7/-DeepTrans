@@ -1,3 +1,9 @@
+// 网站排除规则
+export interface SiteExcludeRule {
+  pattern: string;  // URL 匹配模式（支持 * 通配符）
+  selectors: string;  // 要排除的 CSS 选择器
+}
+
 // 用户配置
 export interface UserConfig {
   apiKey: string;
@@ -9,6 +15,11 @@ export interface UserConfig {
   useContext: boolean;
   showContextMenu: boolean;
   enableThinking: boolean;
+  globalExcludeSelectors: string;
+  siteExcludeRules: SiteExcludeRule[];
+  maxCharsPerBatch: number;
+  concurrency: number;
+  onlyTranslateVisible: boolean;
 }
 
 // 翻译请求
@@ -39,6 +50,13 @@ export interface BatchTranslateResponse {
   results: TranslateResponse[];
 }
 
+// 翻译缓存条目
+export interface TranslationCacheEntry {
+  text: string;
+  translatedText: string;
+  timestamp: number;
+}
+
 // 消息类型
 export type MessageType =
   | 'TRANSLATE_SELECTION'
@@ -52,7 +70,10 @@ export type MessageType =
   | 'UPDATE_CONFIG'
   | 'GET_STATUS'
   | 'TRANSLATION_COMPLETE'
-  | 'CLEAR_TRANSLATIONS';
+  | 'CLEAR_TRANSLATIONS'
+  | 'CLEAR_SITE_CACHE'
+  | 'TRANSLATE_SINGLE'
+  | 'TRANSLATE_OR_TOGGLE';
 
 // 消息
 export interface Message {

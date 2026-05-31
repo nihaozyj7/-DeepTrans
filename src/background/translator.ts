@@ -1,5 +1,4 @@
-import { callDeepSeekAPI, buildTranslationPrompt } from './api';
-import { MAX_BATCH_CHARS, MAX_BATCH_ELEMENTS } from '../lib/constants';
+import { callDeepSeekAPI, buildTranslationPrompt, buildBatchTranslationPrompt } from './api';
 import { TranslateRequest, TranslateResponse, BatchTranslateRequest, BatchTranslateResponse } from '../lib/types';
 import { getConfig } from '../lib/config';
 
@@ -7,16 +6,23 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 15);
 }
 
-function splitIntoBatches(items: TranslateRequest[]): TranslateRequest[][] {
+function splitIntoBatches(items: TranslateRequest[], maxChars: number): TranslateRequest[][] {
   const batches: TranslateRequest[][] = [];
   let currentBatch: TranslateRequest[] = [];
   let currentChars = 0;
 
   for (const item of items) {
-    if (
-      currentBatch.length >= MAX_BATCH_ELEMENTS ||
-      (currentBatch.length > 0 && currentChars + item.text.length > MAX_BATCH_CHARS)
-    ) {
+    if (item.text.length >= maxChars) {
+      if (currentBatch.length > 0) {
+        batches.push(currentBatch);
+        currentBatch = [];
+        currentChars = 0;
+      }
+      batches.push([item]);
+      continue;
+    }
+
+    if (currentBatch.length > 0 && currentChars + item.text.length > maxChars) {
       batches.push(currentBatch);
       currentBatch = [];
       currentChars = 0;
@@ -32,41 +38,28 @@ function splitIntoBatches(items: TranslateRequest[]): TranslateRequest[][] {
   return batches;
 }
 
-function mergeBatchTexts(items: TranslateRequest[]): string {
-  return items.map((item, index) => `[${index + 1}] ${item.text}`).join('\n\n');
+function splitTranslatedText(translated: string, count: number): string[] {
+  const parts = translated.split(/\n\n+/);
+  const results: string[] = [];
+  for (let i = 0; i < count; i++) {
+    results.push((parts[i] || '').trim());
+  }
+  return results;
 }
 
-function splitTranslatedText(translated: string, count: number): string[] {
-  const results: string[] = [];
-  const regex = /\[(\d+)\]\s*/g;
-  let match;
+export async function translateSingle(
+  text: string,
+  targetLang: string,
+  context?: string
+): Promise<string> {
+  const config = await getConfig();
 
-  const matches: Array<{ index: number; end: number }> = [];
-  while ((match = regex.exec(translated)) !== null) {
-    matches.push({ index: parseInt(match[1]) - 1, end: match.index + match[0].length });
+  if (!config.apiKey) {
+    throw new Error('请先在设置中配置 DeepSeek API Key');
   }
 
-  if (matches.length === 0) {
-    const parts = translated.split(/\n\n+/);
-    for (let i = 0; i < count; i++) {
-      results.push(parts[i] || '');
-    }
-    return results;
-  }
-
-  for (let i = 0; i < matches.length; i++) {
-    const start = matches[i].end;
-    const end = i + 1 < matches.length ? translated.lastIndexOf('\n\n', matches[i + 1].end - 5) || matches[i + 1].end : translated.length;
-    results[matches[i].index] = translated.substring(start, end).trim();
-  }
-
-  for (let i = 0; i < count; i++) {
-    if (!results[i]) {
-      results[i] = '';
-    }
-  }
-
-  return results;
+  const messages = buildTranslationPrompt(text, targetLang, context);
+  return callDeepSeekAPI(config.apiKey, config.model, messages, config.enableThinking);
 }
 
 export async function translateBatch(
@@ -85,10 +78,10 @@ export async function translateBatch(
   }
 
   const items = request.items;
-  const mergedText = mergeBatchTexts(items);
+  const texts = items.map(item => item.text);
   const context = items[0]?.context;
 
-  const messages = buildTranslationPrompt(mergedText, config.targetLang, context);
+  const messages = buildBatchTranslationPrompt(texts, config.targetLang, context);
 
   try {
     const translated = await callDeepSeekAPI(config.apiKey, config.model, messages, config.enableThinking);
@@ -113,18 +106,36 @@ export async function translateBatch(
   }
 }
 
-export async function translateAll(items: TranslateRequest[]): Promise<TranslateResponse[]> {
-  const batches = splitIntoBatches(items);
+export async function translateAll(
+  items: TranslateRequest[],
+  onProgress?: (translated: number, total: number) => void
+): Promise<TranslateResponse[]> {
+  const config = await getConfig();
+  const maxChars = config.maxCharsPerBatch || 100;
+  const concurrency = config.concurrency || 3;
+
+  const batches = splitIntoBatches(items, maxChars);
   const allResults: TranslateResponse[] = [];
+  let completedBatches = 0;
 
-  for (const batch of batches) {
-    const batchRequest: BatchTranslateRequest = {
-      batchId: generateId(),
-      items: batch,
-    };
+  for (let i = 0; i < batches.length; i += concurrency) {
+    const batchGroup = batches.slice(i, i + concurrency);
+    const batchPromises = batchGroup.map(batch => {
+      const batchRequest: BatchTranslateRequest = {
+        batchId: generateId(),
+        items: batch,
+      };
+      return translateBatch(batchRequest);
+    });
 
-    const batchResponse = await translateBatch(batchRequest);
-    allResults.push(...batchResponse.results);
+    const batchResults = await Promise.all(batchPromises);
+    for (const result of batchResults) {
+      allResults.push(...result.results);
+      completedBatches++;
+      if (onProgress) {
+        onProgress(completedBatches, batches.length);
+      }
+    }
   }
 
   return allResults;

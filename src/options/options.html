@@ -68,6 +68,16 @@
           <input type="text" id="customSelectors" placeholder="p, h1, h2, h3, div.content">
           <p class="help-text">智能模式下要翻译的元素，用逗号分隔</p>
         </div>
+        <div class="form-group">
+          <label for="maxCharsPerBatch">每次最大字符数</label>
+          <input type="number" id="maxCharsPerBatch" min="10" max="500" step="10">
+          <p class="help-text">每次提交的最大字符数，值越小翻译越快，但请求次数更多（推荐 50-150）</p>
+        </div>
+        <div class="form-group">
+          <label for="concurrency">并发请求数</label>
+          <input type="number" id="concurrency" min="1" max="10" step="1">
+          <p class="help-text">同时发送的翻译请求数量，值越大翻译越快，但 API 压力更大（推荐 2-5）</p>
+        </div>
       </section>
 
       <section class="section">
@@ -99,6 +109,33 @@
             启用思考模式
           </label>
           <p class="help-text">启用 AI 思考模式可能提高翻译质量，但会增加响应时间和 API 成本</p>
+        </div>
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="onlyTranslateVisible">
+            仅翻译可视区域
+          </label>
+          <p class="help-text">只翻译当前屏幕可见的内容（加上上下半屏预加载），可节省 API 调用成本</p>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2>排除设置</h2>
+        <div class="form-group">
+          <label for="globalExcludeSelectors">全局排除选择器</label>
+          <input type="text" id="globalExcludeSelectors" placeholder="code, pre, script, style">
+          <p class="help-text">全局排除的 CSS 选择器，这些元素不会被翻译，用逗号分隔</p>
+        </div>
+
+        <div class="form-group">
+          <label>按网站排除</label>
+          <div id="site-rules-container">
+            <div id="site-rules-list"></div>
+            <button type="button" id="btn-add-site-rule" class="btn btn-outline btn-sm">
+              + 添加网站规则
+            </button>
+          </div>
+          <p class="help-text">为特定网站设置排除规则，支持 * 通配符匹配 URL</p>
         </div>
       </section>
 

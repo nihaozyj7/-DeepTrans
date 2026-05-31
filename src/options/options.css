@@ -220,3 +220,46 @@ select:focus {
   background: #f44336;
   color: white;
 }
+
+.site-rule-item {
+  background: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+.site-rule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.site-rule-header label {
+  margin-bottom: 0;
+  font-weight: 500;
+}
+
+.btn-remove-rule {
+  background: none;
+  border: none;
+  color: #dc3545;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.btn-remove-rule:hover {
+  background: #ffebee;
+}
+
+.site-rule-item input[type="text"] {
+  margin-bottom: 8px;
+}
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 13px;
+}

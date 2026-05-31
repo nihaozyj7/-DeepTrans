@@ -10,6 +10,11 @@ const DEFAULT_CONFIG: UserConfig = {
   useContext: false,
   showContextMenu: true,
   enableThinking: false,
+  globalExcludeSelectors: 'code, pre, script, style, noscript, iframe, svg, math, .notranslate, [contenteditable="false"]',
+  siteExcludeRules: [],
+  maxCharsPerBatch: 100,
+  concurrency: 3,
+  onlyTranslateVisible: true,
 };
 
 export async function getConfig(): Promise<UserConfig> {

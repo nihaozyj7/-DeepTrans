@@ -1,4 +1,4 @@
-import { translateBatch } from './translator';
+import { translateBatch, translateSingle } from './translator';
 import { setupContextMenus, handleContextMenuClick } from './menu';
 import { callDeepSeekAPI, buildTranslationPrompt } from './api';
 import { getConfig } from '../lib/config';
@@ -16,6 +16,15 @@ chrome.storage.onChanged.addListener((changes) => {
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   handleContextMenuClick(info, tab);
+});
+
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === 'translate-page') {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab?.id) {
+      chrome.tabs.sendMessage(tab.id, { type: 'TRANSLATE_OR_TOGGLE' });
+    }
+  }
 });
 
 chrome.runtime.onMessage.addListener((message: Message, sender, sendResponse) => {
@@ -44,6 +53,14 @@ chrome.runtime.onMessage.addListener((message: Message, sender, sendResponse) =>
           sendResponse({ error: error instanceof Error ? error.message : '翻译失败' });
         }
       });
+      return true;
+    }
+
+    case 'TRANSLATE_SINGLE': {
+      const { text, targetLang, context } = message.payload;
+      translateSingle(text, targetLang, context)
+        .then((translatedText) => sendResponse({ translatedText }))
+        .catch((error) => sendResponse({ error: error instanceof Error ? error.message : '翻译失败' }));
       return true;
     }
 

@@ -104,3 +104,29 @@ export function buildTranslationPrompt(
     { role: 'user', content: userContent }
   ];
 }
+
+export function buildBatchTranslationPrompt(
+  texts: string[],
+  targetLang: string,
+  context?: string
+): ChatMessage[] {
+  const systemMessage: ChatMessage = {
+    role: 'system',
+    content: `你是一个专业的翻译引擎。用户会提供多段文本，用换行分隔。请逐段翻译成${targetLang}。规则：
+1. 只输出翻译结果，不要添加任何解释、注释或原文
+2. 严格保持段落数量和顺序，每段翻译结果用换行分隔返回
+3. 不要添加任何编号、序号或标记
+4. 如果原文是代码、URL、数字等不需要翻译的内容，直接原样输出
+5. 如果文本太短或无法翻译，直接原样输出`
+  };
+
+  let userContent = texts.join('\n\n');
+  if (context) {
+    userContent = `上下文信息：\n${context}\n\n待翻译文本：\n${userContent}`;
+  }
+
+  return [
+    systemMessage,
+    { role: 'user', content: userContent }
+  ];
+}

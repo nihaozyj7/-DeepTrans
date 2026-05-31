@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnTranslateSelection = document.getElementById('btn-translate-selection')!;
   const btnToggle = document.getElementById('btn-toggle')!;
   const btnClear = document.getElementById('btn-clear')!;
+  const btnClearCache = document.getElementById('btn-clear-cache')!;
   const btnOptions = document.getElementById('btn-options')!;
   const statusEl = document.getElementById('status')!;
   const statusText = statusEl.querySelector('.status-text')!;
@@ -52,6 +53,11 @@ document.addEventListener('DOMContentLoaded', () => {
   btnClear.addEventListener('click', async () => {
     await sendToContent('CLEAR_TRANSLATIONS');
     setStatus('已清除翻译');
+  });
+
+  btnClearCache.addEventListener('click', async () => {
+    await sendToContent('CLEAR_SITE_CACHE');
+    setStatus('已清除本站缓存');
   });
 
   btnOptions.addEventListener('click', (e) => {

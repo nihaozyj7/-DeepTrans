@@ -1,7 +1,5 @@
 export const DEEPSEEK_API_URL = 'https://api.deepseek.com/chat/completions';
 
-export const MAX_BATCH_CHARS = 100;
-export const MAX_BATCH_ELEMENTS = 5;
 export const MAX_RETRIES = 3;
 export const RETRY_BASE_DELAY = 1000;
 
