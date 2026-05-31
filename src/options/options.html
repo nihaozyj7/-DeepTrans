@@ -20,6 +20,7 @@
       <button class="tab active" data-tab="general">常规</button>
       <button class="tab" data-tab="advanced">高级</button>
       <button class="tab" data-tab="exclusions">排除</button>
+      <button class="tab" data-tab="cache">缓存</button>
     </div>
 
     <form id="settings-form">
@@ -158,6 +159,21 @@
         </section>
       </div>
     </form>
+
+      <div class="tab-content" data-tab="cache">
+        <section class="section">
+          <h2>缓存管理</h2>
+          <p class="help-text" style="margin-bottom:16px">翻译缓存存储在本地，方便重复翻译时直接读取结果，减少 API 调用。</p>
+          <div id="cache-stats">
+            <div class="cache-summary">
+              <span id="cache-total-size">计算中...</span>
+              <span id="cache-total-count"></span>
+            </div>
+            <button type="button" id="btn-clear-all-cache" class="btn btn-danger btn-sm">清除全部缓存</button>
+          </div>
+          <div id="cache-list"></div>
+        </section>
+      </div>
 
     <div class="actions">
       <button type="submit" form="settings-form" class="btn btn-primary">保存设置</button>

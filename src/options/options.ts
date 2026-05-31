@@ -1,6 +1,22 @@
 import { getConfig, updateConfig, DEFAULT_CONFIG } from '../lib/config';
 import { SiteExcludeRule, UserConfig } from '../lib/types';
 
+interface CacheDomainInfo {
+  domain: string;
+  count: number;
+  sizeKB: string;
+  keys: string[];
+}
+
+function getCacheDomainFromKey(key: string): string | null {
+  const match = key.match(/^cache_(.+)_([a-z0-9]+)$/);
+  return match ? match[1] : null;
+}
+
+function calculateEntrySize(key: string, value: any): number {
+  return new Blob([key + JSON.stringify(value)]).size;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const form = document.getElementById('settings-form') as HTMLFormElement;
   const apiKeyInput = document.getElementById('apiKey') as HTMLInputElement;
@@ -149,5 +165,90 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
 
+  const cacheList = document.getElementById('cache-list')!;
+  const cacheTotalSize = document.getElementById('cache-total-size')!;
+  const cacheTotalCount = document.getElementById('cache-total-count')!;
+  const btnClearAllCache = document.getElementById('btn-clear-all-cache') as HTMLButtonElement;
+
+  async function loadCacheStats() {
+    const all = await chrome.storage.local.get(null);
+    const domainMap = new Map<string, CacheDomainInfo>();
+
+    let totalCount = 0;
+    let totalBytes = 0;
+
+    for (const [key, value] of Object.entries(all)) {
+      if (!key.startsWith('cache_')) continue;
+      const domain = getCacheDomainFromKey(key);
+      if (!domain) continue;
+
+      const size = calculateEntrySize(key, value);
+      totalCount++;
+      totalBytes += size;
+
+      const existing = domainMap.get(domain);
+      if (existing) {
+        existing.count++;
+        existing.keys.push(key);
+        existing.sizeKB = ((parseFloat(existing.sizeKB) * 1024 + size) / 1024).toFixed(1);
+      } else {
+        domainMap.set(domain, { domain, count: 1, sizeKB: (size / 1024).toFixed(1), keys: [key] });
+      }
+    }
+
+    const totalKB = (totalBytes / 1024).toFixed(1);
+    cacheTotalSize.innerHTML = `总缓存: <strong>${totalKB} KB</strong>`;
+    cacheTotalCount.textContent = totalCount > 0 ? `(${totalCount} 条记录)` : '';
+    btnClearAllCache.style.display = totalCount > 0 ? '' : 'none';
+
+    renderCacheList(Array.from(domainMap.values()));
+  }
+
+  function renderCacheList(domains: CacheDomainInfo[]) {
+    cacheList.innerHTML = '';
+
+    if (domains.length === 0) {
+      cacheList.innerHTML = '<div class="cache-empty">暂无翻译缓存</div>';
+      return;
+    }
+
+    domains.sort((a, b) => parseFloat(b.sizeKB) - parseFloat(a.sizeKB));
+
+    for (const info of domains) {
+      const item = document.createElement('div');
+      item.className = 'cache-item';
+      item.innerHTML = `
+        <div class="cache-item-info">
+          <span class="cache-item-domain">${info.domain}</span>
+          <span class="cache-item-meta">${info.count} 条记录</span>
+        </div>
+        <div style="display:flex;align-items:center">
+          <span class="cache-item-size">${info.sizeKB} KB</span>
+          <button type="button" class="btn-clear-site">清除</button>
+        </div>
+      `;
+
+      item.querySelector('.btn-clear-site')!.addEventListener('click', async () => {
+        await chrome.storage.local.remove(info.keys);
+        await loadCacheStats();
+        showToast(`已清除 ${info.domain} 的缓存`);
+      });
+
+      cacheList.appendChild(item);
+    }
+  }
+
+  btnClearAllCache.addEventListener('click', async () => {
+    if (!confirm('确定要清除全部翻译缓存吗？此操作不可撤销。')) return;
+    const all = await chrome.storage.local.get(null);
+    const cacheKeys = Object.keys(all).filter(k => k.startsWith('cache_'));
+    if (cacheKeys.length > 0) {
+      await chrome.storage.local.remove(cacheKeys);
+    }
+    await loadCacheStats();
+    showToast('已清除全部缓存');
+  });
+
   await loadConfig();
+  await loadCacheStats();
 });
