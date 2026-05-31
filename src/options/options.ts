@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const showContextMenuCheckbox = document.getElementById('showContextMenu') as HTMLInputElement;
   const enableThinkingCheckbox = document.getElementById('enableThinking') as HTMLInputElement;
   const onlyTranslateVisibleCheckbox = document.getElementById('onlyTranslateVisible') as HTMLInputElement;
-const pageSummaryCheckbox = document.getElementById('pageSummary') as HTMLInputElement;
+  const pageSummaryCheckbox = document.getElementById('pageSummary') as HTMLInputElement;
   const globalExcludeSelectorsInput = document.getElementById('globalExcludeSelectors') as HTMLInputElement;
   const maxCharsPerBatchInput = document.getElementById('maxCharsPerBatch') as HTMLInputElement;
   const concurrencyInput = document.getElementById('concurrency') as HTMLInputElement;
@@ -24,6 +24,16 @@ const pageSummaryCheckbox = document.getElementById('pageSummary') as HTMLInputE
   const toast = document.getElementById('toast')!;
 
   let siteRules: SiteExcludeRule[] = [];
+
+  document.querySelectorAll<HTMLButtonElement>('.tab').forEach(tabBtn => {
+    tabBtn.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      tabBtn.classList.add('active');
+      const tabName = tabBtn.dataset.tab!;
+      document.querySelector(`.tab-content[data-tab="${tabName}"]`)!.classList.add('active');
+    });
+  });
 
   function showToast(message: string, type: 'success' | 'error' = 'success') {
     toast.textContent = message;

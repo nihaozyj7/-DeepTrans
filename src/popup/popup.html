@@ -10,7 +10,9 @@
   <div class="popup-container">
     <div class="header">
       <img src="../icons/icon48.png" alt="Logo" class="logo">
-      <h1>DeepSeek Translator</h1>
+      <div class="header-text">
+        <h1>DeepSeek Translator</h1>
+      </div>
     </div>
 
     <div class="status" id="status">
@@ -20,29 +22,33 @@
 
     <div class="buttons">
       <button id="btn-translate-page" class="btn btn-primary">
-        <span class="btn-icon">📄</span>
+        <span class="btn-emoji">📄</span>
         翻译整个页面
       </button>
       <button id="btn-translate-selection" class="btn btn-secondary">
-        <span class="btn-icon">✏️</span>
+        <span class="btn-emoji">✏️</span>
         翻译选中文本
       </button>
-      <button id="btn-toggle" class="btn btn-outline">
-        <span class="btn-icon">🔄</span>
-        切换原文/译文
-      </button>
-      <button id="btn-clear" class="btn btn-outline btn-danger">
-        <span class="btn-icon">🗑️</span>
-        清除翻译
-      </button>
-      <button id="btn-clear-cache" class="btn btn-outline btn-danger">
-        <span class="btn-icon">🧹</span>
-        清除本站缓存
-      </button>
-      <button id="btn-pick-exclude" class="btn btn-outline">
-        <span class="btn-icon">🎯</span>
-        添加排除选择器
-      </button>
+      <div class="btn-row">
+        <button id="btn-toggle" class="btn btn-outline btn-half">
+          <span class="btn-emoji">🔄</span>
+          切换原文
+        </button>
+        <button id="btn-clear" class="btn btn-outline btn-half btn-danger">
+          <span class="btn-emoji">🗑️</span>
+          清除翻译
+        </button>
+      </div>
+      <div class="btn-row">
+        <button id="btn-clear-cache" class="btn btn-outline btn-half">
+          <span class="btn-emoji">🧹</span>
+          清除缓存
+        </button>
+        <button id="btn-pick-exclude" class="btn btn-outline btn-half">
+          <span class="btn-emoji">🎯</span>
+          排除选择
+        </button>
+      </div>
     </div>
 
     <div class="footer">
