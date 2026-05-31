@@ -20,6 +20,7 @@ export interface UserConfig {
   maxCharsPerBatch: number;
   concurrency: number;
   onlyTranslateVisible: boolean;
+  pageSummary: boolean;
 }
 
 // 翻译请求
@@ -75,7 +76,8 @@ export type MessageType =
   | 'TRANSLATE_SINGLE'
   | 'TRANSLATE_OR_TOGGLE'
   | 'START_PICKER'
-  | 'PICKER_CONFIRM';
+  | 'PICKER_CONFIRM'
+  | 'GET_PAGE_SUMMARY';
 
 // 消息
 export interface Message {

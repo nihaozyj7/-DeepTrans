@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const showContextMenuCheckbox = document.getElementById('showContextMenu') as HTMLInputElement;
   const enableThinkingCheckbox = document.getElementById('enableThinking') as HTMLInputElement;
   const onlyTranslateVisibleCheckbox = document.getElementById('onlyTranslateVisible') as HTMLInputElement;
+const pageSummaryCheckbox = document.getElementById('pageSummary') as HTMLInputElement;
   const globalExcludeSelectorsInput = document.getElementById('globalExcludeSelectors') as HTMLInputElement;
   const maxCharsPerBatchInput = document.getElementById('maxCharsPerBatch') as HTMLInputElement;
   const concurrencyInput = document.getElementById('concurrency') as HTMLInputElement;
@@ -81,6 +82,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     showContextMenuCheckbox.checked = config.showContextMenu;
     enableThinkingCheckbox.checked = config.enableThinking;
     onlyTranslateVisibleCheckbox.checked = config.onlyTranslateVisible;
+    pageSummaryCheckbox.checked = config.pageSummary;
     globalExcludeSelectorsInput.value = config.globalExcludeSelectors;
     maxCharsPerBatchInput.value = config.maxCharsPerBatch.toString();
     concurrencyInput.value = config.concurrency.toString();
@@ -100,6 +102,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       showContextMenu: showContextMenuCheckbox.checked,
       enableThinking: enableThinkingCheckbox.checked,
       onlyTranslateVisible: onlyTranslateVisibleCheckbox.checked,
+      pageSummary: pageSummaryCheckbox.checked,
       globalExcludeSelectors: globalExcludeSelectorsInput.value.trim(),
       siteExcludeRules: siteRules,
       maxCharsPerBatch: parseInt(maxCharsPerBatchInput.value) || 100,

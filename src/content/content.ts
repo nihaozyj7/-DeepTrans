@@ -20,6 +20,29 @@ let currentConfig: any = null;
 let isProcessingQueue = false;
 let showOriginalMode = false;
 let translationGeneration = 0;
+let currentPageSummary: string | null = null;
+
+function extractPageTextForSummary(): string {
+  const parts: string[] = [];
+  if (document.title) parts.push(`[标题] ${document.title}`);
+  const headings = document.querySelectorAll('h1, h2');
+  headings.forEach((h) => {
+    const t = h.textContent?.trim();
+    if (t) parts.push(`[${h.tagName.toLowerCase()}] ${t}`);
+  });
+  const source = document.querySelector('article, main, [role="main"], .content, .post') || document.body;
+  const paragraphs = source.querySelectorAll('p');
+  let count = 0;
+  paragraphs.forEach((p) => {
+    if (count >= 5) return;
+    const t = p.textContent?.trim();
+    if (t && t.length > 10) {
+      parts.push(t);
+      count++;
+    }
+  });
+  return parts.join('\n').slice(0, 1500);
+}
 
 function hashText(text: string): string {
   let hash = 0;
@@ -211,6 +234,7 @@ async function processQueue(generation: number): Promise<void> {
               targetLang: currentConfig.targetLang,
               context: item.context,
             })),
+            pageSummary: currentPageSummary,
           },
         }).then((response: any) => ({ batch, response }));
       });
@@ -263,6 +287,28 @@ function handleScroll(): void {
   }, 300);
 }
 
+async function fetchPageSummary(config: any): Promise<string | null> {
+  if (!config.pageSummary) return null;
+
+  if (currentPageSummary) return currentPageSummary;
+
+  const pageText = extractPageTextForSummary();
+  if (!pageText) return null;
+
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: 'GET_PAGE_SUMMARY',
+      payload: { url: window.location.href, pageText },
+    });
+    if (response?.summary) {
+      currentPageSummary = response.summary;
+      return currentPageSummary;
+    }
+  } catch {}
+
+  return null;
+}
+
 async function handleTranslatePage(): Promise<void> {
   if (isTranslating) {
     showError('正在翻译中，请稍候...');
@@ -287,6 +333,8 @@ async function handleTranslatePage(): Promise<void> {
   try {
     translationQueue = [];
     queuedIds.clear();
+
+    currentPageSummary = await fetchPageSummary(config);
 
     collectVisibleElements();
 
@@ -350,6 +398,10 @@ async function handleTranslateSelection(): Promise<void> {
     return;
   }
 
+  if (!currentPageSummary && config.pageSummary) {
+    currentPageSummary = await fetchPageSummary(config);
+  }
+
   try {
     const cached = await getCachedTranslation(text);
     if (cached) {
@@ -359,7 +411,7 @@ async function handleTranslateSelection(): Promise<void> {
 
     const response = await chrome.runtime.sendMessage({
       type: 'TRANSLATE_SELECTION',
-      payload: { text, targetLang: config.targetLang },
+      payload: { text, targetLang: config.targetLang, pageSummary: currentPageSummary },
     });
 
     if (response.error) {
@@ -494,7 +546,14 @@ chrome.runtime.onMessage.addListener((message: Message, sender, sendResponse) =>
   }
 });
 
+async function prefetchAllPageSummary(): Promise<void> {
+  const config = await getConfig();
+  if (!config.pageSummary || !config.apiKey) return;
+  currentPageSummary = await fetchPageSummary(config);
+}
+
 handleAutoTranslate();
+prefetchAllPageSummary();
 
 let pickerActive = false;
 let pickerOverlay: HTMLElement | null = null;

@@ -83,15 +83,23 @@ export async function callDeepSeekAPI(
 export function buildTranslationPrompt(
   text: string,
   targetLang: string,
-  context?: string
+  context?: string,
+  pageSummary?: string
 ): ChatMessage[] {
-  const systemMessage: ChatMessage = {
-    role: 'system',
-    content: `你是一个专业的翻译引擎。请将用户提供的文本翻译成${targetLang}。规则：
+  let systemContent = `你是一个专业的翻译引擎。请将用户提供的文本翻译成${targetLang}。规则：
 1. 只输出翻译结果，不要添加任何解释、注释或原文
 2. 保持原文的格式（如换行、标点等）
 3. 如果原文是代码、URL、数字等不需要翻译的内容，直接原样输出
-4. 如果文本太短或无法翻译，直接原样输出`
+4. 如果文本太短或无法翻译，直接原样输出`;
+
+  if (pageSummary) {
+    systemContent += `\n\n以下是当前页面的分类和摘要信息，请在翻译时参考这些信息以确保术语和语境的准确性：
+${pageSummary}`;
+  }
+
+  const systemMessage: ChatMessage = {
+    role: 'system',
+    content: systemContent,
   };
 
   let userContent = text;
@@ -108,16 +116,24 @@ export function buildTranslationPrompt(
 export function buildBatchTranslationPrompt(
   texts: string[],
   targetLang: string,
-  context?: string
+  context?: string,
+  pageSummary?: string
 ): ChatMessage[] {
-  const systemMessage: ChatMessage = {
-    role: 'system',
-    content: `你是一个专业的翻译引擎。用户会提供多段文本，用换行分隔。请逐段翻译成${targetLang}。规则：
+  let systemContent = `你是一个专业的翻译引擎。用户会提供多段文本，用换行分隔。请逐段翻译成${targetLang}。规则：
 1. 只输出翻译结果，不要添加任何解释、注释或原文
 2. 严格保持段落数量和顺序，每段翻译结果用换行分隔返回
 3. 不要添加任何编号、序号或标记
 4. 如果原文是代码、URL、数字等不需要翻译的内容，直接原样输出
-5. 如果文本太短或无法翻译，直接原样输出`
+5. 如果文本太短或无法翻译，直接原样输出`;
+
+  if (pageSummary) {
+    systemContent += `\n\n以下是当前页面的分类和摘要信息，请在翻译时参考这些信息以确保术语和语境的准确性：
+${pageSummary}`;
+  }
+
+  const systemMessage: ChatMessage = {
+    role: 'system',
+    content: systemContent,
   };
 
   let userContent = texts.join('\n\n');
@@ -128,5 +144,22 @@ export function buildBatchTranslationPrompt(
   return [
     systemMessage,
     { role: 'user', content: userContent }
+  ];
+}
+
+export function buildPageSummaryPrompt(pageText: string): ChatMessage[] {
+  return [
+    {
+      role: 'system',
+      content: `对以下网页文本进行简要分类和摘要，用紧凑格式输出，不要有多余解释：
+类型: [新闻/博客/文档/论坛/电商/社交/技术文档/其他]
+领域: [科技/体育/财经/医疗/教育等]
+摘要: [1句话概述主要内容]
+术语: [领域术语、人名、品牌等，逗号分隔]`,
+    },
+    {
+      role: 'user',
+      content: pageText,
+    },
   ];
 }

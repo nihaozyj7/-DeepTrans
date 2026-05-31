@@ -50,7 +50,8 @@ function splitTranslatedText(translated: string, count: number): string[] {
 export async function translateSingle(
   text: string,
   targetLang: string,
-  context?: string
+  context?: string,
+  pageSummary?: string
 ): Promise<string> {
   const config = await getConfig();
 
@@ -58,12 +59,13 @@ export async function translateSingle(
     throw new Error('请先在设置中配置 DeepSeek API Key');
   }
 
-  const messages = buildTranslationPrompt(text, targetLang, context);
+  const messages = buildTranslationPrompt(text, targetLang, context, pageSummary);
   return callDeepSeekAPI(config.apiKey, config.model, messages, config.enableThinking);
 }
 
 export async function translateBatch(
-  request: BatchTranslateRequest
+  request: BatchTranslateRequest,
+  pageSummary?: string
 ): Promise<BatchTranslateResponse> {
   const config = await getConfig();
 
@@ -81,7 +83,7 @@ export async function translateBatch(
   const texts = items.map(item => item.text);
   const context = items[0]?.context;
 
-  const messages = buildBatchTranslationPrompt(texts, config.targetLang, context);
+  const messages = buildBatchTranslationPrompt(texts, config.targetLang, context, pageSummary);
 
   try {
     const translated = await callDeepSeekAPI(config.apiKey, config.model, messages, config.enableThinking);

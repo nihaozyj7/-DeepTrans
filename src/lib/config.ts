@@ -15,6 +15,7 @@ const DEFAULT_CONFIG: UserConfig = {
   maxCharsPerBatch: 2000,
   concurrency: 3,
   onlyTranslateVisible: true,
+  pageSummary: false,
 };
 
 export async function getConfig(): Promise<UserConfig> {
