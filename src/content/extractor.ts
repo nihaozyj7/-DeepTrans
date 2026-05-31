@@ -1,5 +1,6 @@
 import { ATTR_ORIGINAL, ATTR_TRANSLATED, DEFAULT_SELECTORS } from '../lib/constants';
 import { SiteExcludeRule, TranslateRequest } from '../lib/types';
+import { detectTextLanguage } from './detector';
 
 function generateId(): string {
   return Math.random().toString(36).substring(2, 15);
@@ -35,6 +36,13 @@ function isMeaninglessText(text: string): boolean {
   if (/^[\d\s\p{P}\p{S}\p{Z}]+$/u.test(trimmed)) return true;
   if (/^[.,;:!?，。；：！？\s]+$/.test(trimmed)) return true;
   return false;
+}
+
+function isAlreadyTargetLang(text: string, targetLang: string): boolean {
+  const detected = detectTextLanguage(text);
+  if (!detected) return false;
+  const targetBase = targetLang.split('-')[0].toLowerCase();
+  return detected === targetBase;
 }
 
 function hasTranslatableText(text: string): boolean {
@@ -178,7 +186,8 @@ export function extractPageElements(
   selectors?: string,
   globalExcludeSelectors?: string,
   siteExcludeRules?: SiteExcludeRule[],
-  onlyVisible: boolean = false
+  onlyVisible: boolean = false,
+  targetLang?: string
 ): Array<{ element: HTMLElement; text: string; id: string; childMap?: Element[] }> {
   const selector = selectors || DEFAULT_SELECTORS;
   const elements = document.querySelectorAll(selector);
@@ -199,6 +208,7 @@ export function extractPageElements(
     if (isMixedContentElement(htmlElement, selector)) {
       const { text, childMap } = buildTextWithPlaceholders(htmlElement);
       if (hasTranslatableText(text.replace(/\[\d+\]/g, '').trim())) {
+        if (targetLang && isAlreadyTargetLang(text.replace(/\[\d+\]/g, '').trim(), targetLang)) return;
         const id = generateId();
         htmlElement.setAttribute(ATTR_ORIGINAL, id);
         results.push({ element: htmlElement, text, id, childMap });
@@ -226,6 +236,7 @@ export function extractPageElements(
     fullText = fullText.trim();
 
     if (hasTranslatableText(fullText)) {
+      if (targetLang && isAlreadyTargetLang(fullText, targetLang)) return;
       const id = generateId();
       htmlElement.setAttribute(ATTR_ORIGINAL, id);
       results.push({ element: htmlElement, text: fullText, id });
@@ -251,9 +262,10 @@ export function extractWithCustomSelectors(
   selectors: string,
   globalExcludeSelectors?: string,
   siteExcludeRules?: SiteExcludeRule[],
-  onlyVisible?: boolean
+  onlyVisible?: boolean,
+  targetLang?: string
 ): Array<{ element: HTMLElement; text: string; id: string; childMap?: Element[] }> {
-  return extractPageElements(selectors, globalExcludeSelectors, siteExcludeRules, onlyVisible);
+  return extractPageElements(selectors, globalExcludeSelectors, siteExcludeRules, onlyVisible, targetLang);
 }
 
 export function buildTranslateRequests(

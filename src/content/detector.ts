@@ -7,7 +7,7 @@ const LANGUAGE_PATTERNS: Record<string, RegExp> = {
   'th': /[\u0e00-\u0e7f]/,
 };
 
-function detectTextLanguage(text: string): string | null {
+export function detectTextLanguage(text: string): string | null {
   const cleanText = text.replace(/[\s\d\p{P}]/gu, '');
   if (cleanText.length < 10) return null;
 

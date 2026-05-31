@@ -73,7 +73,9 @@ export type MessageType =
   | 'CLEAR_TRANSLATIONS'
   | 'CLEAR_SITE_CACHE'
   | 'TRANSLATE_SINGLE'
-  | 'TRANSLATE_OR_TOGGLE';
+  | 'TRANSLATE_OR_TOGGLE'
+  | 'START_PICKER'
+  | 'PICKER_CONFIRM';
 
 // 消息
 export interface Message {

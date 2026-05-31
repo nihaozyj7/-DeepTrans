@@ -83,7 +83,8 @@ function collectVisibleElements(): void {
     currentConfig.customSelectors,
     currentConfig.globalExcludeSelectors,
     currentConfig.siteExcludeRules,
-    currentConfig.onlyTranslateVisible
+    currentConfig.onlyTranslateVisible,
+    currentConfig.targetLang
   );
 
   const requests = buildTranslateRequests(elements, currentConfig.useContext);
@@ -483,9 +484,237 @@ chrome.runtime.onMessage.addListener((message: Message, sender, sendResponse) =>
       handleClearSiteCache().then(() => sendResponse({ success: true }));
       return true;
 
+    case 'START_PICKER':
+      enterPickerMode();
+      sendResponse({ success: true });
+      return false;
+
     default:
       return false;
   }
 });
 
 handleAutoTranslate();
+
+let pickerActive = false;
+let pickerOverlay: HTMLElement | null = null;
+let pickerHoverEl: HTMLElement | null = null;
+let highlightedElements: Element[] = [];
+
+function generateSelector(el: Element): { precise: string; broad: string } {
+  if (el.id) return { precise: `#${CSS.escape(el.id)}`, broad: `#${CSS.escape(el.id)}` };
+
+  const preciseParts: string[] = [];
+  const broadParts: string[] = [];
+  let current: Element | null = el;
+
+  while (current && current !== document.documentElement && current !== document.body) {
+    let part = current.tagName.toLowerCase();
+
+    if (current.className && typeof current.className === 'string') {
+      const classes = current.className.trim().split(/\s+/).filter(c => c && !c.startsWith('dst-'));
+      if (classes.length > 0) {
+        part += '.' + classes.map(c => CSS.escape(c)).join('.');
+      }
+    }
+
+    const parent = current.parentElement;
+    if (parent) {
+      const sameTagSiblings = Array.from(parent.children).filter(s => s.tagName === current!.tagName);
+      if (sameTagSiblings.length > 1) {
+        const index = sameTagSiblings.indexOf(current) + 1;
+        part += `:nth-of-type(${index})`;
+      }
+    }
+
+    preciseParts.unshift(part);
+    broadParts.unshift(part.replace(/:nth-of-type\(\d+\)/g, ''));
+
+    const testSelector = preciseParts.join(' > ');
+    try {
+      if (document.querySelectorAll(testSelector).length === 1) {
+        return { precise: testSelector, broad: broadParts.join(' > ') };
+      }
+    } catch {}
+
+    current = current.parentElement;
+  }
+
+  return { precise: preciseParts.join(' > '), broad: broadParts.join(' > ') };
+}
+
+function clearPickerHighlight(): void {
+  if (pickerHoverEl) {
+    pickerHoverEl.classList.remove('dst-picker-hover');
+    pickerHoverEl = null;
+  }
+}
+
+function clearSelectorHighlight(): void {
+  for (const el of highlightedElements) {
+    el.classList.remove('dst-selector-highlight');
+  }
+  highlightedElements = [];
+}
+
+function updateSelectorHighlight(selector: string): number {
+  clearSelectorHighlight();
+  try {
+    const els = document.querySelectorAll(selector);
+    els.forEach(el => el.classList.add('dst-selector-highlight'));
+    highlightedElements = Array.from(els);
+    return els.length;
+  } catch {
+    return 0;
+  }
+}
+
+function showSelectorEditor(preciseSelector: string, broadSelector: string, clickedEl: Element): void {
+  if (pickerOverlay) pickerOverlay.remove();
+  document.body.classList.remove('dst-picker-active');
+
+  const overlay = document.createElement('div');
+  overlay.id = 'dst-picker-overlay';
+  overlay.className = 'dst-picker-overlay';
+
+  const rect = clickedEl.getBoundingClientRect();
+  const viewportH = window.innerHeight;
+  const spaceBelow = viewportH - rect.bottom;
+  const positionTop = spaceBelow > 200 ? rect.bottom + window.scrollY + 10 : Math.max(rect.top + window.scrollY - 260, 10);
+
+  overlay.style.top = `${positionTop}px`;
+  overlay.style.left = `${Math.min(rect.left + window.scrollX, window.innerWidth - 340 + window.scrollX)}px`;
+
+  const matchCount = updateSelectorHighlight(preciseSelector);
+
+  overlay.innerHTML = `
+    <div class="dst-picker-overlay-title">选择器编辑器</div>
+    <div class="dst-picker-overlay-hint">点击元素生成了以下 CSS 选择器，您可以手动编辑：</div>
+    <label class="dst-picker-overlay-checkbox-label">
+      <input type="checkbox" class="dst-picker-overlay-broad" />
+      <span>选择相似元素（去除索引选择器）</span>
+    </label>
+    <input type="text" class="dst-picker-overlay-input" />
+    <div class="dst-picker-overlay-count">匹配到 <span class="dst-picker-overlay-count-num">${matchCount}</span> 个元素</div>
+    <div class="dst-picker-overlay-actions">
+      <button class="dst-picker-overlay-btn dst-picker-overlay-cancel">取消</button>
+      <button class="dst-picker-overlay-btn dst-picker-overlay-confirm">确认</button>
+    </div>
+  `;
+
+  const input = overlay.querySelector('.dst-picker-overlay-input') as HTMLInputElement;
+  input.value = preciseSelector;
+
+  const broadCheckbox = overlay.querySelector('.dst-picker-overlay-broad') as HTMLInputElement;
+
+  document.body.appendChild(overlay);
+  pickerOverlay = overlay;
+
+  const countNum = overlay.querySelector('.dst-picker-overlay-count-num') as HTMLSpanElement;
+  const confirmBtn = overlay.querySelector('.dst-picker-overlay-confirm') as HTMLButtonElement;
+  const cancelBtn = overlay.querySelector('.dst-picker-overlay-cancel') as HTMLButtonElement;
+
+  broadCheckbox.addEventListener('change', () => {
+    if (broadCheckbox.checked) {
+      input.value = broadSelector;
+    } else {
+      input.value = preciseSelector;
+    }
+    const count = updateSelectorHighlight(input.value);
+    countNum.textContent = String(count);
+  });
+
+  input.addEventListener('input', () => {
+    const count = updateSelectorHighlight(input.value);
+    countNum.textContent = String(count);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      confirmBtn.click();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      cancelBtn.click();
+    }
+  });
+
+  confirmBtn.addEventListener('click', async () => {
+    const finalSelector = input.value.trim();
+    if (!finalSelector) {
+      exitPickerMode();
+      return;
+    }
+    const config = await getConfig();
+    const existing = config.globalExcludeSelectors ? config.globalExcludeSelectors.trim() : '';
+    const updated = existing ? `${existing}, ${finalSelector}` : finalSelector;
+    await chrome.storage.sync.set({ config: { ...config, globalExcludeSelectors: updated } });
+    exitPickerMode();
+  });
+
+  cancelBtn.addEventListener('click', () => {
+    exitPickerMode();
+  });
+
+  input.focus();
+  input.select();
+}
+
+function exitPickerMode(): void {
+  pickerActive = false;
+  clearPickerHighlight();
+  clearSelectorHighlight();
+  if (pickerOverlay) {
+    pickerOverlay.remove();
+    pickerOverlay = null;
+  }
+  document.body.classList.remove('dst-picker-active');
+  document.removeEventListener('mousemove', pickerMouseMoveHandler);
+  document.removeEventListener('click', pickerClickHandler, true);
+  document.removeEventListener('keydown', pickerKeyDownHandler);
+}
+
+function pickerMouseMoveHandler(e: MouseEvent): void {
+  if (!pickerActive) return;
+  const target = e.target as HTMLElement;
+  if (target === document.body || target === document.documentElement) return;
+  if (target.closest('#dst-picker-overlay')) return;
+
+  clearPickerHighlight();
+  pickerHoverEl = target;
+  target.classList.add('dst-picker-hover');
+}
+
+function pickerClickHandler(e: MouseEvent): void {
+  if (!pickerActive) return;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const target = e.target as HTMLElement;
+  if (target.closest('#dst-picker-overlay')) return;
+
+  clearPickerHighlight();
+  document.removeEventListener('mousemove', pickerMouseMoveHandler);
+  document.removeEventListener('click', pickerClickHandler, true);
+
+  const selector = generateSelector(target);
+  showSelectorEditor(selector.precise, selector.broad, target);
+}
+
+function pickerKeyDownHandler(e: KeyboardEvent): void {
+  if (e.key === 'Escape') {
+    exitPickerMode();
+  }
+}
+
+function enterPickerMode(): void {
+  if (pickerActive) {
+    exitPickerMode();
+    return;
+  }
+  pickerActive = true;
+  document.body.classList.add('dst-picker-active');
+  document.addEventListener('mousemove', pickerMouseMoveHandler);
+  document.addEventListener('click', pickerClickHandler, true);
+  document.addEventListener('keydown', pickerKeyDownHandler);
+}

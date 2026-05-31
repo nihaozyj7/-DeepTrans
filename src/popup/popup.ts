@@ -64,4 +64,19 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     chrome.runtime.openOptionsPage();
   });
+
+  const btnPickExclude = document.getElementById('btn-pick-exclude')!;
+  btnPickExclude.addEventListener('click', async () => {
+    const tab = await getActiveTab();
+    if (!tab?.id) {
+      setStatus('无法获取当前标签页', 'error');
+      return;
+    }
+    try {
+      await chrome.tabs.sendMessage(tab.id, { type: 'START_PICKER' });
+      window.close();
+    } catch {
+      setStatus('无法连接到页面，请刷新后重试', 'error');
+    }
+  });
 });
