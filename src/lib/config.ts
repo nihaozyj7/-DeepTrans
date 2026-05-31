@@ -12,7 +12,7 @@ const DEFAULT_CONFIG: UserConfig = {
   enableThinking: false,
   globalExcludeSelectors: 'code, pre, script, style, noscript, iframe, svg, math, .notranslate, [contenteditable="false"]',
   siteExcludeRules: [],
-  maxCharsPerBatch: 100,
+  maxCharsPerBatch: 2000,
   concurrency: 3,
   onlyTranslateVisible: true,
 };

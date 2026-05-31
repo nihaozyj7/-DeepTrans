@@ -1,5 +1,5 @@
 import { extractPageElements, buildTranslateRequests } from './extractor';
-import { replaceWithTranslation, toggleOriginalTranslation, showError, showLoading, hideLoading, clearAllTranslations, getTranslatedCount } from './replacer';
+import { replaceWithTranslation, toggleOriginalTranslation, reapplyTranslation, showError, showLoading, hideLoading, hideAllSpinners, clearAllTranslations, getTranslatedCount, resetUnclaimedElements } from './replacer';
 import { shouldAutoTranslate } from './detector';
 import { Message } from '../lib/types';
 import { getConfig } from '../lib/config';
@@ -18,6 +18,8 @@ let queuedIds = new Set<string>();
 let scrollTimer: number | null = null;
 let currentConfig: any = null;
 let isProcessingQueue = false;
+let showOriginalMode = false;
+let translationGeneration = 0;
 
 function hashText(text: string): string {
   let hash = 0;
@@ -44,6 +46,20 @@ async function getCachedTranslation(text: string): Promise<string | null> {
       } else {
         resolve(null);
       }
+    });
+  });
+}
+
+async function getCachedTranslationsBatch(texts: string[]): Promise<Map<string, string | null>> {
+  const keys = texts.map(t => getCacheKey(t));
+  return new Promise((resolve) => {
+    chrome.storage.local.get(keys, (result) => {
+      const map = new Map<string, string | null>();
+      for (let i = 0; i < texts.length; i++) {
+        const entry = result[keys[i]];
+        map.set(texts[i], entry && entry.translatedText ? entry.translatedText : null);
+      }
+      resolve(map);
     });
   });
 }
@@ -119,37 +135,67 @@ function buildBatches(items: QueueItem[], maxChars: number): QueueItem[][] {
   return batches;
 }
 
-async function processQueue(): Promise<void> {
-  if (isProcessingQueue) return;
+function cancelTranslation(): void {
+  translationGeneration++;
+  translationQueue = [];
+  queuedIds.clear();
+  isTranslating = false;
+  isProcessingQueue = false;
+  hideAllSpinners();
+  resetUnclaimedElements();
+  if (scrollTimer) {
+    clearTimeout(scrollTimer);
+    scrollTimer = null;
+  }
+  window.removeEventListener('scroll', handleScroll);
+}
+
+async function processQueue(generation: number): Promise<void> {
   isProcessingQueue = true;
 
-  const maxChars = currentConfig?.maxCharsPerBatch || 100;
-  const concurrency = currentConfig?.concurrency || 5;
+  const maxChars = currentConfig?.maxCharsPerBatch || 2000;
+  const concurrency = currentConfig?.concurrency || 3;
 
   while (translationQueue.length > 0) {
+    if (translationGeneration !== generation) break;
+
     const pending = translationQueue.splice(0, translationQueue.length);
-    const uncached: QueueItem[] = [];
+    const validItems: QueueItem[] = [];
 
     for (const item of pending) {
       const element = document.querySelector(`[data-dst-original="${item.id}"]`) as HTMLElement;
       if (!element) continue;
       if (element.hasAttribute('data-dst-translated')) continue;
+      validItems.push(item);
+    }
 
-      const cached = await getCachedTranslation(item.text);
+    if (validItems.length === 0) continue;
+
+    const cacheMap = await getCachedTranslationsBatch(validItems.map(item => item.text));
+    if (translationGeneration !== generation) break;
+
+    const uncached: QueueItem[] = [];
+
+    for (const item of validItems) {
+      const cached = cacheMap.get(item.text);
       if (cached) {
-        replaceWithTranslation(item.id, cached, item.childMap);
+        if (!showOriginalMode) {
+          replaceWithTranslation(item.id, cached, item.childMap);
+        }
         continue;
       }
-
       showLoading(item.id);
       uncached.push(item);
     }
 
     if (uncached.length === 0) continue;
+    if (translationGeneration !== generation) break;
 
     const batches = buildBatches(uncached, maxChars);
 
     for (let i = 0; i < batches.length; i += concurrency) {
+      if (translationGeneration !== generation) break;
+
       const group = batches.slice(i, i + concurrency);
 
       const promises = group.map((batch) => {
@@ -172,12 +218,15 @@ async function processQueue(): Promise<void> {
 
       for (const result of results) {
         if (result.status !== 'fulfilled') continue;
+
         const { batch, response } = result.value;
 
         if (response.error) {
           for (const item of batch) {
             hideLoading(item.id);
-            showError(response.error);
+            if (translationGeneration === generation && !showOriginalMode) {
+              showError(response.error);
+            }
           }
           continue;
         }
@@ -187,18 +236,20 @@ async function processQueue(): Promise<void> {
           const item = batch[j];
           const tr = translatedItems[j];
           hideLoading(item.id);
-          if (tr?.error) {
-            showError(tr.error);
-          } else if (tr?.translatedText) {
+          if (tr?.translatedText) {
             await setCachedTranslation(item.text, tr.translatedText);
-            replaceWithTranslation(item.id, tr.translatedText, item.childMap);
+            if (generation === translationGeneration && !showOriginalMode) {
+              replaceWithTranslation(item.id, tr.translatedText, item.childMap);
+            }
           }
         }
       }
     }
   }
 
-  isProcessingQueue = false;
+  if (translationGeneration === generation) {
+    isProcessingQueue = false;
+  }
 }
 
 function handleScroll(): void {
@@ -207,7 +258,7 @@ function handleScroll(): void {
   }
   scrollTimer = window.setTimeout(() => {
     collectVisibleElements();
-    processQueue();
+    processQueue(translationGeneration);
   }, 300);
 }
 
@@ -223,6 +274,12 @@ async function handleTranslatePage(): Promise<void> {
     return;
   }
 
+  if (showOriginalMode) {
+    showOriginalMode = false;
+    reapplyTranslation();
+  }
+
+  const generation = ++translationGeneration;
   isTranslating = true;
   currentConfig = config;
 
@@ -232,28 +289,42 @@ async function handleTranslatePage(): Promise<void> {
 
     collectVisibleElements();
 
-    if (translationQueue.length === 0) {
+    if (translationQueue.length === 0 && getTranslatedCount() === 0) {
       showError('未找到可翻译的文本');
       return;
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true });
 
-    await processQueue();
+    await processQueue(generation);
   } catch (error) {
     showError(error instanceof Error ? error.message : '翻译失败');
   } finally {
-    isTranslating = false;
+    if (translationGeneration === generation) {
+      isTranslating = false;
+    }
   }
 }
 
 async function handleTranslateOrToggle(): Promise<void> {
-  if (isTranslating) {
+  if (isTranslating && !showOriginalMode) {
+    showOriginalMode = true;
+    cancelTranslation();
+    toggleOriginalTranslation();
+    return;
+  }
+
+  if (showOriginalMode) {
+    showOriginalMode = false;
+    reapplyTranslation();
+    resetUnclaimedElements();
+    await handleTranslatePage();
     return;
   }
 
   if (getTranslatedCount() > 0) {
     toggleOriginalTranslation();
+    showOriginalMode = !showOriginalMode;
     return;
   }
 
@@ -385,16 +456,25 @@ chrome.runtime.onMessage.addListener((message: Message, sender, sendResponse) =>
       return true;
 
     case 'TOGGLE_ORIGINAL':
-      toggleOriginalTranslation();
+      if (isTranslating && !showOriginalMode) {
+        showOriginalMode = true;
+        cancelTranslation();
+        toggleOriginalTranslation();
+      } else if (showOriginalMode) {
+        showOriginalMode = false;
+        reapplyTranslation();
+        resetUnclaimedElements();
+        handleTranslatePage();
+      } else if (getTranslatedCount() > 0) {
+        toggleOriginalTranslation();
+        showOriginalMode = !showOriginalMode;
+      }
       sendResponse({ success: true });
       return false;
 
     case 'CLEAR_TRANSLATIONS':
-      window.removeEventListener('scroll', handleScroll);
-      translationQueue = [];
-      queuedIds.clear();
-      isTranslating = false;
-      isProcessingQueue = false;
+      cancelTranslation();
+      showOriginalMode = false;
       clearAllTranslations();
       sendResponse({ success: true });
       return false;

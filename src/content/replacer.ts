@@ -63,47 +63,59 @@ function replaceMixedContent(
   translatedText: string,
   childMap: Element[]
 ): boolean {
+  const directTextNodes: Text[] = [];
+  for (const child of Array.from(element.childNodes)) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      const t = child.textContent || '';
+      if (t.trim().length > 0) {
+        directTextNodes.push(child as Text);
+      }
+    }
+  }
+  if (directTextNodes.length === 0) return true;
+
   const markerRegex = /\[(\d+)\]/g;
   const matches = [...translatedText.matchAll(markerRegex)];
 
-  if (matches.length === 0) {
-    return false;
-  }
-
-  const segments: string[] = [];
-  let lastIndex = 0;
-
-  for (const match of matches) {
-    const idx = parseInt(match[1]);
-    if (idx >= 0 && idx < childMap.length) {
-      segments.push(translatedText.substring(lastIndex, match.index));
-      lastIndex = match.index! + match[0].length;
+  if (matches.length > 0) {
+    const segments: string[] = [];
+    let lastIndex = 0;
+    for (const match of matches) {
+      const idx = parseInt(match[1]);
+      if (idx >= 0 && idx < childMap.length) {
+        segments.push(translatedText.substring(lastIndex, match.index).trim());
+        lastIndex = match.index! + match[0].length;
+      }
     }
+    segments.push(translatedText.substring(lastIndex).trim());
+
+    const textSegments = segments.filter(s => s.length > 0);
+    let segIndex = 0;
+    for (const tn of directTextNodes) {
+      if (segIndex < textSegments.length) {
+        tn.textContent = textSegments[segIndex];
+        segIndex++;
+      } else {
+        tn.textContent = '';
+      }
+    }
+    return true;
   }
-  segments.push(translatedText.substring(lastIndex));
 
-  const originalChildNodes = Array.from(element.childNodes);
-  const textSegments = segments.filter(s => s.length > 0);
+  const originalLengths = directTextNodes.map(n => (n.textContent || '').length);
+  const totalLength = originalLengths.reduce((sum, l) => sum + l, 0);
+  if (totalLength === 0) return true;
 
-  let segIndex = 0;
-  let markerCount = 0;
-
-  for (const node of originalChildNodes) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const t = node.textContent || '';
-      if (t.trim()) {
-        if (segIndex < textSegments.length) {
-          (node as Text).textContent = textSegments[segIndex];
-          segIndex++;
-        } else {
-          (node as Text).textContent = '';
-        }
-      }
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const el = node as Element;
-      if (isInlineChild(el) && markerCount < childMap.length) {
-        markerCount++;
-      }
+  let remaining = translatedText;
+  for (let i = 0; i < directTextNodes.length; i++) {
+    if (i === directTextNodes.length - 1) {
+      directTextNodes[i].textContent = remaining;
+    } else {
+      const ratio = originalLengths[i] / totalLength;
+      const partLength = Math.round(translatedText.length * ratio);
+      const part = remaining.substring(0, partLength);
+      directTextNodes[i].textContent = part;
+      remaining = remaining.substring(partLength);
     }
   }
 
@@ -163,6 +175,22 @@ export function toggleOriginalTranslation(): void {
   });
 }
 
+export function reapplyTranslation(): void {
+  translatedElements.forEach((info) => {
+    if (!info.isShowingTranslation) {
+      if (info.childMap && info.childMap.length > 0) {
+        const success = replaceMixedContent(info.element, info.translatedText, info.childMap);
+        if (!success) {
+          replaceTextNodes(info.element, info.translatedText);
+        }
+      } else {
+        replaceTextNodes(info.element, info.translatedText);
+      }
+      info.isShowingTranslation = true;
+    }
+  });
+}
+
 export function showError(message: string): void {
   const existing = document.getElementById('dst-error-toast');
   if (existing) existing.remove();
@@ -197,6 +225,21 @@ export function showLoading(elementId: string): void {
 export function hideLoading(elementId: string): void {
   const spinner = document.querySelector(`[data-dst-spinner="${elementId}"]`);
   if (spinner) spinner.remove();
+}
+
+export function hideAllSpinners(): void {
+  const spinners = document.querySelectorAll('[data-dst-spinner]');
+  spinners.forEach(s => s.remove());
+}
+
+export function resetUnclaimedElements(): void {
+  const claimed = document.querySelectorAll(`[${ATTR_ORIGINAL}]`);
+  claimed.forEach(el => {
+    const id = el.getAttribute(ATTR_ORIGINAL);
+    if (id && !translatedElements.has(id)) {
+      el.removeAttribute(ATTR_ORIGINAL);
+    }
+  });
 }
 
 export function getTranslatedCount(): number {
