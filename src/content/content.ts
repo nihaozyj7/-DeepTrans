@@ -555,6 +555,14 @@ async function prefetchAllPageSummary(): Promise<void> {
 handleAutoTranslate();
 prefetchAllPageSummary();
 
+function matchUrlPattern(url: string, pattern: string): boolean {
+  const regexStr = pattern
+    .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*/g, '.*');
+  const regex = new RegExp(`^${regexStr}$`, 'i');
+  return regex.test(url);
+}
+
 let pickerActive = false;
 let pickerOverlay: HTMLElement | null = null;
 let pickerHoverEl: HTMLElement | null = null;
@@ -645,6 +653,7 @@ function showSelectorEditor(preciseSelector: string, broadSelector: string, clic
   overlay.style.left = `${Math.min(rect.left + window.scrollX, window.innerWidth - 340 + window.scrollX)}px`;
 
   const matchCount = updateSelectorHighlight(preciseSelector);
+  const currentHostname = window.location.hostname;
 
   overlay.innerHTML = `
     <div class="dst-picker-overlay-title">选择器编辑器</div>
@@ -655,6 +664,17 @@ function showSelectorEditor(preciseSelector: string, broadSelector: string, clic
     </label>
     <input type="text" class="dst-picker-overlay-input" />
     <div class="dst-picker-overlay-count">匹配到 <span class="dst-picker-overlay-count-num">${matchCount}</span> 个元素</div>
+    <div class="dst-picker-overlay-scope">
+      <div class="dst-picker-overlay-scope-label">应用范围：</div>
+      <label class="dst-picker-overlay-radio-label">
+        <input type="radio" name="dst-scope" value="site" checked />
+        <span>当前网站 (${currentHostname})</span>
+      </label>
+      <label class="dst-picker-overlay-radio-label">
+        <input type="radio" name="dst-scope" value="global" />
+        <span>所有网站（全局）</span>
+      </label>
+    </div>
     <div class="dst-picker-overlay-actions">
       <button class="dst-picker-overlay-btn dst-picker-overlay-cancel">取消</button>
       <button class="dst-picker-overlay-btn dst-picker-overlay-confirm">确认</button>
@@ -705,9 +725,27 @@ function showSelectorEditor(preciseSelector: string, broadSelector: string, clic
       return;
     }
     const config = await getConfig();
-    const existing = config.globalExcludeSelectors ? config.globalExcludeSelectors.trim() : '';
-    const updated = existing ? `${existing}, ${finalSelector}` : finalSelector;
-    await chrome.storage.sync.set({ config: { ...config, globalExcludeSelectors: updated } });
+    const scopeRadio = overlay.querySelector('input[name="dst-scope"]:checked') as HTMLInputElement;
+    const scope = scopeRadio?.value || 'site';
+
+    if (scope === 'global') {
+      const existing = config.globalExcludeSelectors ? config.globalExcludeSelectors.trim() : '';
+      const updated = existing ? `${existing}, ${finalSelector}` : finalSelector;
+      await chrome.storage.sync.set({ config: { ...config, globalExcludeSelectors: updated } });
+    } else {
+      const currentUrl = window.location.href;
+      const siteRules = config.siteExcludeRules ? [...config.siteExcludeRules] : [];
+      const existingRuleIndex = siteRules.findIndex(rule => matchUrlPattern(currentUrl, rule.pattern));
+
+      if (existingRuleIndex >= 0) {
+        const existingSelectors = siteRules[existingRuleIndex].selectors ? siteRules[existingRuleIndex].selectors.trim() : '';
+        siteRules[existingRuleIndex].selectors = existingSelectors ? `${existingSelectors}, ${finalSelector}` : finalSelector;
+      } else {
+        siteRules.push({ pattern: currentUrl, selectors: finalSelector });
+      }
+
+      await chrome.storage.sync.set({ config: { ...config, siteExcludeRules: siteRules } });
+    }
     exitPickerMode();
   });
 
